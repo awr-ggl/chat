@@ -2,7 +2,7 @@ name: Tinode Dev Deployment
 
 on:
   push:
-     branches: [OPS-307_tinodeDeployment]
+     branches: [development]
 
 jobs:
   deploy:
