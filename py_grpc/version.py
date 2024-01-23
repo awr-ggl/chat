@@ -2,7 +2,7 @@
 
 from subprocess import check_output
 
-command = 'git describe --tags'
+command = 'git describe --tags --always'
 
 def git_version():
     line = check_output(command.split()).decode('utf-8').strip()

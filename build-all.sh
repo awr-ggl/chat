@@ -25,7 +25,7 @@ version=${tag#?}
 
 if [ -z "$version" ]; then
   # Get last git tag as release version. Tag looks like 'v.1.2.3', so strip 'v'.
-  version=`git describe --tags`
+  version=`git describe --tags --always`
   version=${version#?}
 fi
 
@@ -114,7 +114,7 @@ do
     fi
 
     env GOOS="${plat}" GOARCH="${arc}" go build \
-      -ldflags "-s -w -X main.buildstamp=`git describe --tags`" -tags "${buildtag}" \
+      -ldflags "-s -w -X main.buildstamp=`git describe --tags --always`" -tags "${buildtag}" \
       -o ./releases/tmp/tinode${ext} ./server > /dev/null
     env GOOS="${plat}" GOARCH="${arc}" go build \
       -ldflags "-s -w" -tags "${buildtag}" -o ./releases/tmp/init-db${ext} ./tinode-db > /dev/null
