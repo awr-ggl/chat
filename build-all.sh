@@ -5,16 +5,16 @@
 # copied and archived.
 
 # Supported OSs: mac (darwin), windows, linux.
-goplat=( darwin darwin windows linux linux )
+goplat=( linux )
 
 # CPUs architectures: amd64 and arm64. The same order as OSs.
-goarc=( amd64 arm64 amd64 amd64 arm64 )
+goarc=( amd64 )
 
 # Number of platform+architectures.
 buildCount=${#goplat[@]}
 
 # Supported database tags
-dbadapters=( mysql mongodb rethinkdb postgres )
+dbadapters=( mysql )
 dbtags=( ${dbadapters[@]} alldbs )
 
 for line in $@; do
@@ -25,19 +25,19 @@ version=${tag#?}
 
 if [ -z "$version" ]; then
   # Get last git tag as release version. Tag looks like 'v.1.2.3', so strip 'v'.
-  version=`git describe --tags`
+  version=`git describe --tags --always`
   version=${version#?}
 fi
 
 echo "Releasing $version"
 
-GOSRC=..
-
-pushd ${GOSRC}/chat > /dev/null
+GOSRC=.
 
 # Prepare directory for the new release
 rm -fR ./releases/${version}
+rm -fR ./binaries/
 mkdir ./releases/${version}
+mkdir ./binaries
 
 # Tar on Mac is inflexible about directories. Let's just copy release files to
 # one directory.
@@ -91,7 +91,7 @@ do
   # Remove possibly existing keygen from previous build.
   rm -f ./releases/tmp/keygen
   rm -f ./releases/tmp/keygen.exe
-
+  
   # Keygen is database-independent
   env GOOS="${plat}" GOARCH="${arc}" go build -ldflags "-s -w" -o ./releases/tmp/keygen${ext} ./keygen > /dev/null
 
@@ -114,7 +114,7 @@ do
     fi
 
     env GOOS="${plat}" GOARCH="${arc}" go build \
-      -ldflags "-s -w -X main.buildstamp=`git describe --tags`" -tags "${buildtag}" \
+      -ldflags "-s -w -X main.buildstamp=`git describe --tags --always`" -tags "${buildtag}" \
       -o ./releases/tmp/tinode${ext} ./server > /dev/null
     env GOOS="${plat}" GOARCH="${arc}" go build \
       -ldflags "-s -w" -tags "${buildtag}" -o ./releases/tmp/init-db${ext} ./tinode-db > /dev/null
@@ -138,6 +138,12 @@ do
       rm -f ./releases/${version}/tinode-${dbtag}."${plat2}-${arc}".tar.gz
       # Generate a new one
       tar -C ./releases/tmp -zcf ./releases/${version}/tinode-${dbtag}."${plat2}-${arc}".tar.gz .
+
+      rm -Rf ./binaries/${version}-${dbtag}
+      mkdir ./binaries/${version}-${dbtag}
+      
+      echo "Extracting compiled to binaries folder : ./binaries/${version}-${dbtag}"
+      tar -xf ./releases/${version}/tinode-${dbtag}."${plat2}-${arc}".tar.gz -C ./binaries/${version}-${dbtag}
     fi
   done
 done
@@ -152,11 +158,11 @@ echo "Packaging chatbot.py..."
 rm -fR ./releases/tmp
 mkdir -p ./releases/tmp
 
-cp ${GOSRC}/chat/chatbot/python/chatbot.py ./releases/tmp
-cp ${GOSRC}/chat/chatbot/python/quotes.txt ./releases/tmp
-cp ${GOSRC}/chat/chatbot/python/requirements.txt ./releases/tmp
+cp ${GOSRC}/chatbot/python/chatbot.py ./releases/tmp
+cp ${GOSRC}/chatbot/python/quotes.txt ./releases/tmp
+cp ${GOSRC}/chatbot/python/requirements.txt ./releases/tmp
 
-tar -C ${GOSRC}/chat/releases/tmp -zcf ./releases/${version}/py-chatbot.tar.gz .
+tar -C ${GOSRC}/releases/tmp -zcf ./releases/${version}/py-chatbot.tar.gz .
 pushd ./releases/tmp > /dev/null
 zip -q -r ../${version}/py-chatbot.zip ./*
 popd > /dev/null
@@ -167,15 +173,13 @@ echo "Packaging tn-cli..."
 rm -fR ./releases/tmp
 mkdir -p ./releases/tmp
 
-cp ${GOSRC}/chat/tn-cli/*.py ./releases/tmp
-cp ${GOSRC}/chat/tn-cli/*.txt ./releases/tmp
+cp ${GOSRC}/tn-cli/*.py ./releases/tmp
+cp ${GOSRC}/tn-cli/*.txt ./releases/tmp
 
-tar -C ${GOSRC}/chat/releases/tmp -zcf ./releases/${version}/tn-cli.tar.gz .
+tar -C ${GOSRC}/releases/tmp -zcf ./releases/${version}/tn-cli.tar.gz .
 pushd ./releases/tmp > /dev/null
 zip -q -r ../${version}/tn-cli.zip ./*
 popd > /dev/null
 
 # Clean up temporary files
 rm -fR ./releases/tmp
-
-popd > /dev/null
