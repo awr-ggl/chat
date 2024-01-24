@@ -21,7 +21,7 @@ jobs:
         run: ${{ env.CHANGE_DIR }} sudo supervisorctl stop tinode"
 
       - name: Copy Binary
-        run: ${{ env.CHANGE_DIR }} sudo cp binaries/$(git describe --tags --always )-mysql/tinode /var/www/tinode-mysql-v0.22.11/tinode"
+        run: ${{ env.CHANGE_DIR }} sudo cp binaries/$(git describe --tags --always | sed 's/^v//')-mysql/tinode /var/www/tinode-mysql-v0.22.11/tinode"
 
       - name: Start Tinode Service
         run: ${{ env.CHANGE_DIR }} sudo supervisorctl start tinode"
