@@ -303,6 +303,7 @@ func main() {
 	if *reset || created {
 		genDb(&data)
 	} else if len(data.Users) > 0 {
+		log.Println(len(data.Users), "users found in sample data. Ignoring.")
 		log.Println("Sample data ignored.")
 	}
 
@@ -310,6 +311,8 @@ func main() {
 	if *makeRoot != "" {
 		adapter := store.Store.GetAdapter()
 		userId := types.ParseUserId(*makeRoot)
+		//debug userId
+		log.Printf("userId: %v", userId)
 		if userId.IsZero() {
 			log.Fatalf("Must specify a valid user ID '%s' to promote to ROOT", *makeRoot)
 		}

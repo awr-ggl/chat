@@ -1,0 +1,58 @@
+# This script shows what can be done with tn-cli macros. Run it as
+#
+#   python tn-cli.py --no-login < sample-macro-script.txt
+#
+# The script performs the following:
+#
+#  - Creates a new user Test User with useradd
+#  - Logs in as Xena (user has root privileges)
+#  - Changes Test User's name to 'Test User 1'
+#  - Modifies Test User's default anon acs to JR with chacs
+#  - Sets Test User's password to test456
+#  - Deletes Test User with userdel
+#  - Uses resolve to locate user Alice
+#  - Subscribes to Alice
+#  - Sends a message to Alice
+
+# Login as usr.
+# .must $usr login --scheme=basic --secret=1684426476GC20gy:67or05ka
+
+.must $usr login --scheme=basic --secret=bob:bob123
+
+.use $usr.sub[0].user_id
+
+.must sub grppQw179RgniM
+
+pub grppQw179RgniM '1'
+
+.sleep 2000
+
+pub grppQw179RgniM '2'
+
+.sleep 500
+
+pub grppQw179RgniM '3'
+
+pub grppQw179RgniM '4'
+
+pub grppQw179RgniM '5'
+
+.must $usr2 login --scheme=basic --secret=d:d123
+
+.use $usr2.sub[0].user_id
+
+.must sub grppQw179RgniM
+
+pub grppQw179RgniM '1'
+
+.sleep 2000
+
+pub grppQw179RgniM '2'
+
+.sleep 500
+
+pub grppQw179RgniM '3'
+
+pub grppQw179RgniM '4'
+
+pub grppQw179RgniM '5'
