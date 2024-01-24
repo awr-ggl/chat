@@ -3,15 +3,32 @@ name: Tinode Dev Deployment
 on:
   push:
      branches: [development]
+env:
+  CHANGE_DIR: sudo ssh -i /root/.ssh/runner -tt runner@${{ secrets.SERVER_IP }} "cd ${{ secrets.DIRECTORY_PATH }};
 
 jobs:
   deploy:
-    name: Deploy to tinode-dev
-    if: ${{ always() }}
-    uses: awr-ggl/action/.github/workflows/tinode_dev.yml@main
-    with:
-      DIRECTORY_PATH: /var/www/chat/
-      SERVER_IP: 10.184.15.195
-    secrets:
-      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    name: Deploy Tinode Dev
+    runs-on: self-hosted
+    steps:
+      - name: Git Pull
+        run: ${{ env.CHANGE_DIR }} sudo git fetch origin; sudo git checkout development && sudo git pull"
       
+      - name: Build binary
+        run: ${{ env.CHANGE_DIR }} ./build-all.sh"
+  
+      - name: Stop Tinode Service
+        run: ${{ env.CHANGE_DIR }} sudo supervisorctl stop tinode"
+
+      - name: Copy Binary
+        run: ${{ env.CHANGE_DIR }} sudo cp binaries/$(git describe --tags --always )-mysql/tinode /var/www/tinode-mysql-v0.22.11/tinode"
+
+      - name: Start Tinode Service
+        run: ${{ env.CHANGE_DIR }} sudo supervisorctl start tinode"
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          content: "Deployed to tinode-dev server"
