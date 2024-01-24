@@ -15,7 +15,7 @@ jobs:
         run: ${{ env.CHANGE_DIR }} sudo git fetch origin; sudo git checkout development && sudo git pull"
       
       - name: Build binary
-        run: ${{ env.CHANGE_DIR }} ./build-all.sh"
+        run: ${{ env.CHANGE_DIR }} sudo ./build-all.sh"
   
       - name: Stop Tinode Service
         run: ${{ env.CHANGE_DIR }} sudo supervisorctl stop tinode"
