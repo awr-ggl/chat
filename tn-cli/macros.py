@@ -416,6 +416,60 @@ class Creategroup(Macro):
                 ]
 
 
+class Chatdemo(Macro):
+    """Chat as users. 
+    chatdemo --what cred --group grppQw179RgniM usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY"""
+
+    def name(self):
+        return "chatdemo"
+
+    def description(self):
+        return "Chat as users (requires root privileges)"
+
+    def add_parser_args(self):
+        self.parser.add_argument('userid', help='User id')
+        self.parser.add_argument('--group', help='Group topic id')
+        self.parser.add_argument('--what', choices=['desc', 'cred'], required=True,
+                                 help='Type of data to print (desc - public/private data, cred - list of credentials.')
+
+    def expand(self, id, cmd, args):
+        if not cmd.userid:
+            return None
+        print(cmd.userid)
+        users = cmd.userid.split(',')
+        print(users)
+        varname = cmd.varname if hasattr(
+            cmd, 'varname') and cmd.varname else '$temp'
+        old_user = tn_globals.DefaultUser if tn_globals.DefaultUser else ''
+        """
+        ['.use --user %s' % cmd.userid,
+                '.must sub me',
+                '.must %s get me --%s' % (varname, cmd.what),
+                '.must sub %s' % cmd.group,
+                'pub %s "Hola!"' % cmd.group,
+                '.must leave me',
+                '.use --user "%s"' % old_user,
+                '.log %s' % varname]
+        """
+        script = []
+        for user in users:
+            # random message
+            print('============constructing script for %s ============' % user)
+            script.append('.use --user %s' % user)
+            script.append('.must sub me')
+            script.append('.must %s get me --%s' % (varname, cmd.what))
+            script.append('.must sub %s' % cmd.group)
+            script.append('.must get %s --sub' % cmd.group)
+            for i in range(0, 2):
+                message = '%s - %s' % (random.randint(1000, 9999), user)
+                script.append('pub %s "%s"' % (cmd.group, message))
+            script.append('.must leave me')
+            script.append('.must leave %s' % cmd.group)
+            script.append('.sleep 1500')
+        # print(script)
+        return script
+
+
 def parse_macro(parts):
     """Attempts to find a parser for the provided sequence of tokens."""
     global Macros
@@ -426,5 +480,5 @@ def parse_macro(parts):
     return macro.parser
 
 
-Macros = {x.name(): x for x in [Usermod(), Resolve(), Passwd(), Useradd(
-), Chacs(), Userdel(), Chcred(), Thecard(), Creategroup(), Subsuserstogroup()]}
+Macros = {x.name(): x for x in [Usermod(), Resolve(), Passwd(
+), Useradd(), Chacs(), Userdel(), Chcred(), Thecard(), Chatdemo(),  Creategroup(), Subsuserstogroup()]}
