@@ -3,7 +3,8 @@ const { spawn } = require('child_process');
 
 const app = express();
 app.use(express.json());
-const port = 3000;
+const port = process.argv[2] || 3000;
+const ip = process.argv[3] || '0.0.0.0';
 
 app.post('/execute', (req, res) => {
     console.log(req.body)
@@ -28,6 +29,6 @@ app.post('/execute', (req, res) => {
     });
 });
 
-app.listen(port, () => {
+app.listen(port, ip, () => {
     console.log(`Server is running on port ${port}`);
 });
