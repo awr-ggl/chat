@@ -24,7 +24,7 @@ jobs:
         run: ${{ env.CHANGE_DIR }} sudo cp /var/www/tinode-mysql-v0.22.11/tinode /var/www/tinode-mysql-v0.22.11/tinode_$(date +\%d_\%m_\%Y)"
 
       - name: Copy New Binary
-        run: ${{ env.CHANGE_DIR }} && version=\$(git describe --tags --always | sed 's/^v//') ; sudo cp binaries/\$version-mysql/tinode /var/www/tinode-mysql-v0.22.11/tinode"
+        run: ${{ env.CHANGE_DIR }} version=\$(git describe --tags --always | sed 's/^v//') ; sudo cp binaries/\$version-mysql/tinode /var/www/tinode-mysql-v0.22.11/tinode"
 
       - name: Start Tinode Service
         run: ${{ env.CHANGE_DIR }} sudo supervisorctl start tinode"
