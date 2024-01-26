@@ -319,8 +319,9 @@ def client_message_loop(stream):
                             'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
                             'Content-Type': 'application/json'
                         }
+                        group = msg.data.topic
                         data = {
-                            'script': 'chatdemo --what cred --group grppQw179RgniM usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY\n'
+                            'script': 'chatdemo --what cred --group '+group+' usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY\n'
                         }
                         response = requests.post(
                             url, headers=headers, json=data)
