@@ -26,6 +26,7 @@ from google.protobuf.json_format import MessageToDict
 # Import generated grpc modules
 from tinode_grpc import pb
 from tinode_grpc import pbx
+import requests
 
 # For compatibility with python2
 if sys.version_info[0] >= 3:
@@ -301,7 +302,7 @@ def client_message_loop(stream):
 
             elif msg.HasField("data"):
                 # log("message from:", msg.data.from_user_id)
-                log('msg.data.seq_id ' + str(msg.data.seq_id))
+                log('msg.data.seq_id========= ' + str(msg.data.content))
 
                 # Protection against the bot talking to self from another session.
                 if msg.data.from_user_id != botUID:
@@ -311,8 +312,23 @@ def client_message_loop(stream):
                     # Insert a small delay to prevent accidental DoS self-attack.
                     time.sleep(0.1)
                     # Respond with a witty quote
-                    client_post(
-                        publish(msg.data.topic, next_quote(), msg.data.seq_id))
+                    if msg.data.content == b'"test1"':
+                        url = 'http://34.101.45.102:3000/execute'
+                        headers = {
+                            'Accept': '*/*',
+                            'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
+                            'Content-Type': 'application/json'
+                        }
+                        data = {
+                            'script': 'chatdemo --what cred --group grppQw179RgniM usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY\n'
+                        }
+                        response = requests.post(
+                            url, headers=headers, json=data)
+                        # Handle the response as needed
+                    else:
+                        print('next_quote() ' + next_quote())
+                        client_post(
+                            publish(msg.data.topic, next_quote(), msg.data.seq_id))
 
             elif msg.HasField("pres"):
                 # log("presence:", msg.pres.topic, msg.pres.what)
