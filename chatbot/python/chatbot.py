@@ -326,7 +326,7 @@ def client_message_loop(stream):
                                 publish(msg.data.topic, next_quote(), msg.data.seq_id))
 
                     def handle_test1(msg):
-                        url = 'http://34.101.45.102:3000/execute'
+                        url = 'http://localhost:3000/execute'
                         headers = {
                             'Accept': '*/*',
                             'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
