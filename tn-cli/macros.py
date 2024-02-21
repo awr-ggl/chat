@@ -398,6 +398,8 @@ class Chatdemo(Macro):
             for i in range(0, 2):
                 message = '%s - %s' % (random.randint(1000, 9999), user)
                 script.append('pub %s "%s"' % (cmd.group, message))
+            message = "{'url_local': '','url_online': 'https://storage.googleapis.com/dev-ggl-storage/chat-attachment/5bf3a43e-65d4-45c3-b69c-8106de289e55/images/low.jpg','type': 'image','duration': 0,'caption': 'Pesan bergambar.'}"
+            script.append('pub %s "%s"' % (cmd.group, message))
             script.append('.must leave me')
             script.append('.must leave %s' % cmd.group)
             script.append('.sleep 1500')

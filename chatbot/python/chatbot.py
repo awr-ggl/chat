@@ -311,8 +311,21 @@ def client_message_loop(stream):
                     client_post(note_read(msg.data.topic, msg.data.seq_id))
                     # Insert a small delay to prevent accidental DoS self-attack.
                     time.sleep(0.1)
-                    # Respond with a witty quote
-                    if msg.data.content == b'"test1"':
+
+                    def handle_message(msg):
+                        switch = {
+                            b'"test1"': lambda: handle_test1(msg),
+                            # Add more cases here as needed
+                        }
+                        case = switch.get(msg.data.content)
+                        if case:
+                            case()
+                        else:
+                            print('next_quote() ' + next_quote())
+                            client_post(
+                                publish(msg.data.topic, next_quote(), msg.data.seq_id))
+
+                    def handle_test1(msg):
                         url = 'http://34.101.45.102:3000/execute'
                         headers = {
                             'Accept': '*/*',
@@ -326,10 +339,9 @@ def client_message_loop(stream):
                         response = requests.post(
                             url, headers=headers, json=data)
                         # Handle the response as needed
-                    else:
-                        print('next_quote() ' + next_quote())
-                        client_post(
-                            publish(msg.data.topic, next_quote(), msg.data.seq_id))
+
+                    # Call handle_message(msg) instead of the if-else block
+                    handle_message(msg)
 
             elif msg.HasField("pres"):
                 # log("presence:", msg.pres.topic, msg.pres.what)
