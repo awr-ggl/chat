@@ -11,7 +11,7 @@ app.post('/execute', async (req, res) => {
     // Request Body: {"script": "chatdemo --what cred --group grppQw179RgniM usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY\n"}
     const tinode_script = req.body.script;
     // bob is ROOT. How? See tinode-db/README.md
-    let pythonProcess = spawn('python', ['tn-cli.py', '--host', tinode_grpc_server, '--verbose', '--login-basic','bob:bob123']);
+    let pythonProcess = spawn(pythonBinary, ['tn-cli.py', '--host', tinode_grpc_server, '--verbose', '--login-basic', rootAccount]);
 
     pythonProcess.stdin.write(tinode_script);
     pythonProcess.stdin.end();
@@ -27,6 +27,47 @@ app.post('/execute', async (req, res) => {
     pythonProcess.on('close', (code) => {
         console.log(`child process exited with code ${code}`);
         res.send(`child process exited with code ${code}`);
+    });
+});
+
+app.post('/create/group-chat', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    let groupName = req.body.name;
+    let groupOwnnerId = req.body.group_admin;
+    let userids = req.body.userids.join(",");
+
+    let pythonProcess = spawn(pythonBinary, ['tn-cli-json.py', '--host', tinode_grpc_server, '--verbose', '--login-basic', rootAccount]);
+    let pythonProcess2 = spawn(pythonBinary, ['tn-cli-json.py', '--host', tinode_grpc_server, '--verbose', '--login-basic', rootAccount]);
+    pythonProcess.stdin.write("crgroup '"+ groupOwnnerId +"' --name '" + groupName + "'");
+    pythonProcess.stdin.end();
+
+    var groupData = {};
+    pythonProcess.stdout.on('data', (data) => {
+        var str = data.toString(), lines = str.split(/(\r?\n)/g);
+        for (var i = 0; i < lines.length; i++) {
+            try {
+                let resp = JSON.parse(lines[i])
+
+                if (resp.in.ctrl) {
+                    if (resp.in.ctrl.topic.includes('grp')) {
+                        groupData = resp.in.ctrl;
+
+                        pythonProcess2.stdin.write("substogroup '" + userids + "' --groupid '" + groupData.topic + "'");
+                        pythonProcess2.stdin.end();
+                    }
+                }
+            } catch (e) {
+            }
+        }
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`child process exited with code ${code}`);
+        res.json(groupData)
     });
 });
 

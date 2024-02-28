@@ -3,7 +3,9 @@
 import argparse
 import random
 import tn_globals
+import json
 from tn_globals import stdoutln
+import random
 
 
 class Macro:
@@ -351,60 +353,67 @@ class Thecard(Macro):
                 '.log %s' % varname]
 
 
-class Chatdemo(Macro):
-    """Chat as users. 
-    chatdemo --what cred --group grppQw179RgniM usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY"""
+class Subsuserstogroup(Macro):
+    """Subscribe multiple user to one group."""
 
     def name(self):
-        return "chatdemo"
+        return "substogroup"
 
     def description(self):
-        return "Chat as users (requires root privileges)"
+        return "Subscribe multiple user to one group. (requires root privileges)"
 
     def add_parser_args(self):
-        self.parser.add_argument('userid', help='User id')
-        self.parser.add_argument('--group', help='Group topic id')
-        self.parser.add_argument('--what', choices=['desc', 'cred'], required=True,
-                                 help='Type of data to print (desc - public/private data, cred - list of credentials.')
+        self.parser.add_argument('userids', help='User ids split by (,)')
+        self.parser.add_argument('--groupid', required=True, help='group id')
+
+    def expand(self, id, cmd, args):
+        if not cmd.userids:
+            return None
+
+        users = cmd.userids.split(',')
+        script = []
+        varname = cmd.varname if hasattr(
+            cmd, 'varname') and cmd.varname else '$temp'
+        old_user = tn_globals.DefaultUser if tn_globals.DefaultUser else ''
+
+        for user in users:
+            script.append('.use --user %s' % user)
+            script.append('.must sub me')
+            script.append('.must sub %s' % cmd.groupid)
+            script.append('.must leave me')
+            script.append('.must leave %s' % cmd.groupid)
+            script.append('.sleep 500')
+
+        return script
+
+
+class Creategroup(Macro):
+    """Create group on behalf this user."""
+
+    def name(self):
+        return "crgroup"
+
+    def description(self):
+        return "Create group on behalf this user."
+
+    def add_parser_args(self):
+        self.parser.add_argument('userid', help='Group owner User id')
+        self.parser.add_argument('--name', required=True, help='Group Name')
 
     def expand(self, id, cmd, args):
         if not cmd.userid:
             return None
-        print(cmd.userid)
-        users = cmd.userid.split(',')
-        print(users)
+
+        tnGroupId = random.randrange(100000, 999999)
         varname = cmd.varname if hasattr(
             cmd, 'varname') and cmd.varname else '$temp'
         old_user = tn_globals.DefaultUser if tn_globals.DefaultUser else ''
-        """
-        ['.use --user %s' % cmd.userid,
-                '.must sub me',
-                '.must %s get me --%s' % (varname, cmd.what),
-                '.must sub %s' % cmd.group,
-                'pub %s "Hola!"' % cmd.group,
+        return ['.use --user %s' % cmd.userid,
+                '.log %s' % tn_globals.Variables,
+                '.must %s sub "new%s" --fn "%s" --auth JRWPSD' % (
+                    varname, tnGroupId, cmd.name),
                 '.must leave me',
-                '.use --user "%s"' % old_user,
-                '.log %s' % varname]
-        """
-        script = []
-        for user in users:
-            # random message
-            print('============constructing script for %s ============' % user)
-            script.append('.use --user %s' % user)
-            script.append('.must sub me')
-            script.append('.must %s get me --%s' % (varname, cmd.what))
-            script.append('.must sub %s' % cmd.group)
-            script.append('.must get %s --sub' % cmd.group)
-            for i in range(0, 2):
-                message = '%s - %s' % (random.randint(1000, 9999), user)
-                script.append('pub %s "%s"' % (cmd.group, message))
-            message = "{'url_local': '','url_online': 'https://storage.googleapis.com/dev-ggl-storage/chat-attachment/5bf3a43e-65d4-45c3-b69c-8106de289e55/images/low.jpg','type': 'image','duration': 0,'caption': 'Pesan bergambar.'}"
-            script.append('pub %s "%s"' % (cmd.group, message))
-            script.append('.must leave me')
-            script.append('.must leave %s' % cmd.group)
-            script.append('.sleep 1500')
-        # print(script)
-        return script
+                ]
 
 
 def parse_macro(parts):
@@ -417,5 +426,5 @@ def parse_macro(parts):
     return macro.parser
 
 
-Macros = {x.name(): x for x in [Usermod(), Resolve(), Passwd(
-), Useradd(), Chacs(), Userdel(), Chcred(), Thecard(), Chatdemo()]}
+Macros = {x.name(): x for x in [Usermod(), Resolve(), Passwd(), Useradd(
+), Chacs(), Userdel(), Chcred(), Thecard(), Creategroup(), Subsuserstogroup()]}
