@@ -26,7 +26,6 @@ from google.protobuf.json_format import MessageToDict
 # Import generated grpc modules
 from tinode_grpc import pb
 from tinode_grpc import pbx
-import requests
 
 # For compatibility with python2
 if sys.version_info[0] >= 3:
@@ -240,13 +239,10 @@ def leave(topic):
     return pb.ClientMsg(leave=pb.ClientLeave(id=tid, topic=topic))
 
 
-def publish(topic, text, seq_id=None):
+def publish(topic, text):
     tid = next_id()
-    head = {"auto": json.dumps(True).encode('utf-8')}
-    if seq_id != None:
-        head["reply"] = json.dumps(seq_id).encode('utf-8')
     return pb.ClientMsg(pub=pb.ClientPub(id=tid, topic=topic, no_echo=True,
-                                         head=head, content=json.dumps(text).encode('utf-8')))
+                                         head={"auto": json.dumps(True).encode('utf-8')}, content=json.dumps(text).encode('utf-8')))
 
 
 def note_read(topic, seq):
@@ -302,7 +298,6 @@ def client_message_loop(stream):
 
             elif msg.HasField("data"):
                 # log("message from:", msg.data.from_user_id)
-                log('msg.data.seq_id========= ' + str(msg.data.content))
 
                 # Protection against the bot talking to self from another session.
                 if msg.data.from_user_id != botUID:
@@ -311,37 +306,8 @@ def client_message_loop(stream):
                     client_post(note_read(msg.data.topic, msg.data.seq_id))
                     # Insert a small delay to prevent accidental DoS self-attack.
                     time.sleep(0.1)
-
-                    def handle_message(msg):
-                        switch = {
-                            b'"test1"': lambda: handle_test1(msg),
-                            # Add more cases here as needed
-                        }
-                        case = switch.get(msg.data.content)
-                        if case:
-                            case()
-                        else:
-                            print('next_quote() ' + next_quote())
-                            client_post(
-                                publish(msg.data.topic, next_quote(), msg.data.seq_id))
-
-                    def handle_test1(msg):
-                        url = 'http://localhost:3000/execute'
-                        headers = {
-                            'Accept': '*/*',
-                            'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
-                            'Content-Type': 'application/json'
-                        }
-                        group = msg.data.topic
-                        data = {
-                            'script': 'chatdemo --what cred --group '+group+' usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY\n'
-                        }
-                        response = requests.post(
-                            url, headers=headers, json=data)
-                        # Handle the response as needed
-
-                    # Call handle_message(msg) instead of the if-else block
-                    handle_message(msg)
+                    # Respond with a witty quote
+                    client_post(publish(msg.data.topic, next_quote()))
 
             elif msg.HasField("pres"):
                 # log("presence:", msg.pres.topic, msg.pres.what)
