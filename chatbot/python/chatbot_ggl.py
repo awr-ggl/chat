@@ -319,14 +319,15 @@ def client_message_loop(stream):
                     time.sleep(0.1)
 
                     def handle_message(msg):
-                        # Check if message.data.content starts with "test1" or "bot1"
+                        # Check if message.data.content which is a byte type starts with "test1" or "bot1"
                         # If it does, call the appropriate function
                         # Otherwise, print the next quote
-                        if msg.data.content.startswith("test1"):
+                        if msg.data.content.startswith(b'"test1"'):
                             handle_test1(msg)
-                        elif msg.data.content.startswith("bot1"):
+                        elif msg.data.content.startswith(b'"bot1"'):
                             handle_bot1(msg)
                         else:
+                            print('next_quote() ' + next_quote())
                             client_post(
                                 publish(msg.data.topic, next_quote(), msg.data.seq_id))
 
