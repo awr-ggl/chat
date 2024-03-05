@@ -19,6 +19,8 @@ import random
 import signal
 import sys
 import time
+from groq import Groq
+
 
 import grpc
 from google.protobuf.json_format import MessageToDict
@@ -47,6 +49,10 @@ onCompletion = {}
 
 # This is needed for gRPC ssl to work correctly.
 os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
+
+groq_client = Groq(
+    api_key=os.environ.get("GROQ_API_KEY"),
+)
 
 
 def log(*args):
@@ -315,6 +321,7 @@ def client_message_loop(stream):
                     def handle_message(msg):
                         switch = {
                             b'"test1"': lambda: handle_test1(msg),
+                            b'"bot1"': lambda: handle_bot1(msg),
                             # Add more cases here as needed
                         }
                         case = switch.get(msg.data.content)
@@ -324,6 +331,26 @@ def client_message_loop(stream):
                             print('next_quote() ' + next_quote())
                             client_post(
                                 publish(msg.data.topic, next_quote(), msg.data.seq_id))
+
+                    def handle_bot1(msg):
+                        # Get actual prompt from message (anything after "bot1:")
+                        prompt = msg.data.content.split("bot1:")[1]
+                        chat_completion = groq_client.chat.completions.create(
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": "You are a Indonesian fitness and diet coach. Always reply with Bahasa Indonesia. You focus on healthy diet and resistance training to help fatloss. You're clients persona is an Indonesian Moms age 30-50. You should refer to them as 'Kakak' or 'Kak' for short to make the conversation not as formal as corporate but still not consider them as old woman. Also consider that our customer (Indonesian Female, age 30-50) are also not tech savy and may have difficulty to comprehend jargons especially in English. Please response and align the language tone accordingly."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": prompt,
+                                }
+                            ],
+                            model="mixtral-8x7b-32768",
+                        )
+                        response = chat_completion.choices[0].message.content
+                        client_post(
+                            publish(msg.data.topic, response, msg.data.seq_id))
 
                     def handle_test1(msg):
                         url = 'http://localhost:3000/execute'
