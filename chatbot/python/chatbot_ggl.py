@@ -322,19 +322,21 @@ def client_message_loop(stream):
                         # Check if message.data.content which is a byte type starts with "test1" or "bot1"
                         # If it does, call the appropriate function
                         # Otherwise, print the next quote
+                        print('==============msgdatacontent=========')
+                        print(msg.data.content[:5])
+                        print('==============msgdatacontent=========')
                         if msg.data.content.startswith(b'"test1"'):
                             handle_test1(msg)
-                        elif msg.data.content.startswith(b'"bot1"'):
+                        elif msg.data.content[:5] == b'"bot1':
+                            print(msg.data.content)
                             handle_bot1(msg)
                         else:
-                            print('next_quote() ' + next_quote())
                             client_post(
                                 publish(msg.data.topic, next_quote(), msg.data.seq_id))
 
                     def handle_bot1(msg):
                         # Get actual prompt from message (anything after "bot1:")
-                        prompt = msg.data.content.split("bot1:")[1]
-                        print(prompt)
+                        prompt = msg.data.content.decode().split("bot1")[1]
                         chat_completion = groq_client.chat.completions.create(
                             messages=[
                                 {
