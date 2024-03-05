@@ -319,12 +319,14 @@ def client_message_loop(stream):
                     time.sleep(0.1)
 
                     def handle_message(msg):
-                        if msg.data.content == b'"test1"':
+                        # Check if message.data.content starts with "test1" or "bot1"
+                        # If it does, call the appropriate function
+                        # Otherwise, print the next quote
+                        if msg.data.content.startswith("test1"):
                             handle_test1(msg)
-                        elif msg.data.content == b'"bot1"':
+                        elif msg.data.content.startswith("bot1"):
                             handle_bot1(msg)
                         else:
-                            # print('next_quote() ' + next_quote())
                             client_post(
                                 publish(msg.data.topic, next_quote(), msg.data.seq_id))
 
