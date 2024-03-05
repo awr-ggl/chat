@@ -319,16 +319,12 @@ def client_message_loop(stream):
                     time.sleep(0.1)
 
                     def handle_message(msg):
-                        switch = {
-                            b'"test1"': lambda: handle_test1(msg),
-                            b'"bot1"': lambda: handle_bot1(msg),
-                            # Add more cases here as needed
-                        }
-                        case = switch.get(msg.data.content)
-                        if case:
-                            case()
+                        if msg.data.content == b'"test1"':
+                            handle_test1(msg)
+                        elif msg.data.content == b'"bot1"':
+                            handle_bot1(msg)
                         else:
-                            print('next_quote() ' + next_quote())
+                            # print('next_quote() ' + next_quote())
                             client_post(
                                 publish(msg.data.topic, next_quote(), msg.data.seq_id))
 
