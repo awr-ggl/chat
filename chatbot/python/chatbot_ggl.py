@@ -335,6 +335,7 @@ def client_message_loop(stream):
                     def handle_bot1(msg):
                         # Get actual prompt from message (anything after "bot1:")
                         prompt = msg.data.content.split("bot1:")[1]
+                        print(prompt)
                         chat_completion = groq_client.chat.completions.create(
                             messages=[
                                 {
