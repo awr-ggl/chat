@@ -6,12 +6,16 @@ app.use(express.json());
 const port = process.argv[2] || 3000;
 const ip = process.argv[3] || '0.0.0.0';
 const tinode_grpc_server = process.argv[4] || 'localhost:16060'; // 34.101.45.102:16060
+const rootAccount = process.env.TINODE_ROOT_ACCOUNT_CRED || 'bob:bob123';
+const pythonBinary = process.env.PYTHON_BINARY || 'python';
+
 app.post('/execute', async (req, res) => {
     console.log(req.body)
     // Request Body: {"script": "chatdemo --what cred --group grppQw179RgniM usrMSeBdwoBrJ8,usrMDDxrn4YuLg,usrHKiDc0XQudY\n"}
     const tinode_script = req.body.script;
     // bob is ROOT. How? See tinode-db/README.md
     let pythonProcess = spawn(pythonBinary, ['tn-cli.py', '--host', tinode_grpc_server, '--verbose', '--login-basic', rootAccount]);
+
     pythonProcess.stdin.write(tinode_script);
     pythonProcess.stdin.end();
 
