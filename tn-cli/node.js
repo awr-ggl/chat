@@ -91,7 +91,9 @@ app.post('/create/community/group-chat', (req, res) => {
                 let resp = JSON.parse(lines[i])
 
                 if (resp.in.ctrl) {
-                    groupData = resp.in.ctrl;
+                    if (resp.in.ctrl.topic.includes('grp')) {
+                        groupData = resp.in.ctrl;
+                    }
                 }
             } catch (e) {
             }
