@@ -74,7 +74,7 @@ app.post('/create/group-chat', (req, res) => {
     });
 });
 
-app.post('/create/comunity/group-chat', (req, res) => {
+app.post('/create/community/group-chat', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     let groupName = req.body.name;
     let groupOwnnerId = req.body.group_admin;
