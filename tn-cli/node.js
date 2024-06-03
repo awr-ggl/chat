@@ -74,6 +74,42 @@ app.post('/create/group-chat', (req, res) => {
     });
 });
 
+app.post('/create/community/group-chat', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    let groupName = req.body.name;
+    let groupOwnnerId = req.body.group_admin;
+
+    let pythonProcess = spawn(pythonBinary, ['tn-cli-json.py', '--host', tinode_grpc_server, '--verbose', '--login-basic', rootAccount]);
+    pythonProcess.stdin.write("crgroup '"+ groupOwnnerId +"' --name '" + groupName + "'");
+    pythonProcess.stdin.end();
+
+    var groupData = {};
+    pythonProcess.stdout.on('data', (data) => {
+        var str = data.toString(), lines = str.split(/(\r?\n)/g);
+        for (var i = 0; i < lines.length; i++) {
+            try {
+                let resp = JSON.parse(lines[i])
+
+                if (resp.in.ctrl) {
+                    if (resp.in.ctrl.topic.includes('grp')) {
+                        groupData = resp.in.ctrl;
+                    }
+                }
+            } catch (e) {
+            }
+        }
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`child process exited with code ${code}`);
+        res.json(groupData)
+    });
+});
+
 app.listen(port, ip, () => {
     console.log(`Server is running on port ${port}`);
 });
