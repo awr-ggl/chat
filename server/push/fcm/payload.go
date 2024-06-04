@@ -166,7 +166,11 @@ func PrepareV1Notifications(rcpt *push.Receipt, config *configType) ([]*fcmv1.Me
 					Data:  userData,
 				}
 
-				switch d.Platform {
+				// Somehow, our database store Platform as `Android` and `IOS` making all this case ignored
+				// Changing the hardcoded case will not guarantee the platform keyword case will always follow
+				// So I lowercase them here
+				platform := strings.ToLower(d.Platform)
+				switch platform {
 				case "android":
 					msg.Android = androidNotificationConfig(rcpt.Payload.What, topic, userData, config)
 				case "ios":
@@ -295,7 +299,10 @@ func androidNotificationConfig(what, topic string, data map[string]string, confi
 		Body:                 body,
 		Icon:                 config.Android.GetStringField(what, "Icon"),
 		Color:                config.Android.GetStringField(what, "Color"),
-		ClickAction:          config.Android.GetStringField(what, "ClickAction"),
+		// FCM will default to open app if click_action is not sent
+		// And removing push.config.android.click_action will not suffice
+		// because it will be included anyway here with empty string.
+		// ClickAction:          config.Android.GetStringField(what, "ClickAction"), 
 	}
 
 	return ac
