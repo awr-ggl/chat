@@ -1,2 +1,5 @@
 binaries
 releases
+venv/
+node_modules/
+.aider*

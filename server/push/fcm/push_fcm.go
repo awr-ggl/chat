@@ -5,9 +5,12 @@
 package fcm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"os"
 
 	fbase "firebase.google.com/go"
@@ -17,7 +20,6 @@ import (
 	"github.com/tinode/chat/server/logs"
 	"github.com/tinode/chat/server/push"
 	"github.com/tinode/chat/server/push/common"
-	"github.com/tinode/chat/server/store"
 	"github.com/tinode/chat/server/store/types"
 
 	"golang.org/x/oauth2/google"
@@ -109,17 +111,17 @@ func (Handler) Init(jsonconf json.RawMessage) (bool, error) {
 	}
 
 	handler.input = make(chan *push.Receipt, bufferSize)
-	handler.channel = make(chan *push.ChannelReq, bufferSize)
 	handler.stop = make(chan bool, 1)
 	handler.projectID = credentials.ProjectID
 
+	// There used to be a goroutine for
+	// the Channel for subscribing/unsubscribing devices to FCM topics.
+	// Omitted temporarily as we don't need it for now.
 	go func() {
 		for {
 			select {
 			case rcpt := <-handler.input:
 				go sendFcmV1(rcpt, &config)
-			case sub := <-handler.channel:
-				go processSubscription(sub)
 			case <-handler.stop:
 				return
 			}
@@ -129,41 +131,65 @@ func (Handler) Init(jsonconf json.RawMessage) (bool, error) {
 	return true, nil
 }
 
+// send the jsonMsg to our custom fcm queue
+//curl --location '34.101.108.131:8080/queues/groupchat_msg_fcm/jobs' \
+// --header 'Content-Type: application/json' \
+// --header 'Authorization: Bearer 1234' \
+// --data '[
+//     {
+//         "name": "msg",
+//         "data": {
+//             "token": "fdstHnJKRqaisaeuvFpLDf:APA91bFgL3BdCk0egDq4slrJB8J_xYQd20-JLgyqK54IEY1TbtkFnmbr6BIzGjfUlWvaqAaIuGkrGB6RtrV7tqEHY4DeBg3Yu1wN0EWxkglwhND6qeeD9_-lzboh_Qb_DQBfaGanP36X",
+//             "content": "from_server"
+//         }
+//     }
+// ]'
+
+func sendToQueue(jsonMsg string) {
+	// send the jsonMsg to our custom fcm queue
+	// [ { "name": "msg", "data": from jsonMsg]
+	// TODO: set url from config
+	// BullMQ url from Getenv (OS Environment Variable)
+	var bullmq_proxy_url = os.Getenv("BULLMQ_PROXY_URL")
+	var bullmq_proxy_token = os.Getenv("BULLMQ_PROXY_TOKEN")
+	if bullmq_proxy_token == "" {
+		bullmq_proxy_token = "1234"
+	}
+	url := bullmq_proxy_url + "/queues/groupchat_msg_fcm/jobs"
+	body := []byte(fmt.Sprintf(`[{"name": "msg", "data": %s}]`, jsonMsg))
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		fmt.Println("Failed to create HTTP request:", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+bullmq_proxy_token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Failed to send HTTP request:", err)
+		return
+	}
+	fmt.Println("FCM sent to queue")
+
+	defer resp.Body.Close()
+}
+
 func sendFcmV1(rcpt *push.Receipt, config *configType) {
 	messages, uids := PrepareV1Notifications(rcpt, config)
 	for i := range messages {
-		req := &fcmv1.SendMessageRequest{
-			Message:      messages[i],
-			ValidateOnly: config.DryRun,
+		// Create the FCM message request.
+		jsonMsg, errJson := json.Marshal(messages[i])
+		if errJson != nil {
+			fmt.Println("Failed to marshal message to JSON:", errJson)
+			continue
 		}
-		_, err := handler.v1.Projects.Messages.Send("projects/"+handler.projectID, req).Do()
-		if err != nil {
-			gerr, decodingErrs := common.DecodeGoogleApiError(err)
-			for _, err := range decodingErrs {
-				logs.Info.Println("fcm googleapi.Error decoding:", err)
-			}
-			switch gerr.FcmErrCode {
-			case "": // no error
-			case common.ErrorQuotaExceeded, common.ErrorUnavailable, common.ErrorInternal, common.ErrorUnspecified:
-				// Transient errors. Stop sending this batch.
-				logs.Warn.Println("fcm transient failure:", gerr.FcmErrCode, gerr.ErrMessage)
-				return
-			case common.ErrorSenderIDMismatch, common.ErrorInvalidArgument, common.ErrorThirdPartyAuth:
-				// Config errors. Stop.
-				logs.Warn.Println("fcm invalid config:", gerr.FcmErrCode, gerr.ErrMessage)
-				return
-			case common.ErrorUnregistered:
-				// Token is no longer valid. Delete token from DB and continue sending.
-				logs.Warn.Println("fcm invalid token:", gerr.FcmErrCode, gerr.ErrMessage)
-				if err := store.Devices.Delete(uids[i], messages[i].Token); err != nil {
-					logs.Warn.Println("tnpg failed to delete invalid token:", err)
-				}
-			default:
-				// Unknown error. Stop sending just in case.
-				logs.Warn.Println("tnpg unrecognized error:", gerr.FcmErrCode, gerr.ErrMessage)
-				return
-			}
-		}
+		fmt.Println(uids)
+		sendToQueue(string(jsonMsg))
+		return
 	}
 }
 
