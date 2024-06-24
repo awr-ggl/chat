@@ -151,13 +151,12 @@ func (ah *awshandler) Init(jsconf string) error {
 	return err
 }
 
-// Headers redirects GET, HEAD requests to the AWS server.
+// Headers adds CORS headers and redirects GET and HEAD requests to the AWS server.
 func (ah *awshandler) Headers(req *http.Request, serve bool) (http.Header, int, error) {
-	if req.Method == http.MethodPut || req.Method == http.MethodPost {
-		return nil, 0, nil
-	}
 
-	if headers, status := media.CORSHandler(req, ah.conf.CorsOrigins, serve); status != 0 {
+	// Add CORS headers, if necessary.
+	headers, status := media.CORSHandler(req, ah.conf.CorsOrigins, serve)
+	if status != 0 || req.Method == http.MethodPost || req.Method == http.MethodPut {
 		return headers, status, nil
 	}
 
