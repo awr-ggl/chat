@@ -5,20 +5,20 @@
 package fcm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
 	"os"
 
 	fbase "firebase.google.com/go"
 	legacy "firebase.google.com/go/messaging"
 	fcmv1 "google.golang.org/api/fcm/v1"
 
-	"github.com/tinode/chat/server/logs"
 	"github.com/tinode/chat/server/push"
 	"github.com/tinode/chat/server/push/common"
-	"github.com/tinode/chat/server/store"
-	"github.com/tinode/chat/server/store/types"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -109,17 +109,17 @@ func (Handler) Init(jsonconf json.RawMessage) (bool, error) {
 	}
 
 	handler.input = make(chan *push.Receipt, bufferSize)
-	handler.channel = make(chan *push.ChannelReq, bufferSize)
 	handler.stop = make(chan bool, 1)
 	handler.projectID = credentials.ProjectID
 
+	// There used to be a goroutine for
+	// the Channel for subscribing/unsubscribing devices to FCM topics.
+	// Omitted temporarily as we don't need it for now.
 	go func() {
 		for {
 			select {
 			case rcpt := <-handler.input:
 				go sendFcmV1(rcpt, &config)
-			case sub := <-handler.channel:
-				go processSubscription(sub)
 			case <-handler.stop:
 				return
 			}
@@ -129,121 +129,146 @@ func (Handler) Init(jsonconf json.RawMessage) (bool, error) {
 	return true, nil
 }
 
+// send the jsonMsg to our custom fcm queue
+//curl --location '34.101.108.131:8080/queues/groupchat_msg_fcm/jobs' \
+// --header 'Content-Type: application/json' \
+// --header 'Authorization: Bearer 1234' \
+// --data '[
+//     {
+//         "name": "msg",
+//         "data": {
+//             "token": "fdstHnJKRqaisaeuvFpLDf:APA91bFgL3BdCk0egDq4slrJB8J_xYQd20-JLgyqK54IEY1TbtkFnmbr6BIzGjfUlWvaqAaIuGkrGB6RtrV7tqEHY4DeBg3Yu1wN0EWxkglwhND6qeeD9_-lzboh_Qb_DQBfaGanP36X",
+//             "content": "from_server"
+//         }
+//     }
+// ]'
+
+func sendToQueue(jsonMsg string) {
+	// send the jsonMsg to our custom fcm queue
+	// [ { "name": "msg", "data": from jsonMsg]
+	// TODO: set url from config
+	// BullMQ url from Getenv (OS Environment Variable)
+	var bullmq_proxy_url = os.Getenv("BULLMQ_PROXY_URL")
+	var bullmq_proxy_token = os.Getenv("BULLMQ_PROXY_TOKEN")
+	if bullmq_proxy_token == "" {
+		bullmq_proxy_token = "1234"
+	}
+	// fmt.Printf("jsonMsg: %s\n", jsonMsg)
+	url := bullmq_proxy_url + "/queues/groupchat_msg_fcm/jobs"
+	body := []byte(fmt.Sprintf(`[{"name": "msg", "data": %s}]`, jsonMsg))
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		fmt.Println("Failed to create HTTP request:", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+bullmq_proxy_token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Failed to send HTTP request:", err)
+		return
+	}
+	defer resp.Body.Close()
+}
+
 func sendFcmV1(rcpt *push.Receipt, config *configType) {
 	messages, uids := PrepareV1Notifications(rcpt, config)
+	fmt.Println("messages count:", len(messages))
+	fmt.Println(uids)
 	for i := range messages {
-		req := &fcmv1.SendMessageRequest{
-			Message:      messages[i],
-			ValidateOnly: config.DryRun,
+		// Create the FCM message request.
+		jsonMsg, errJson := json.Marshal(messages[i])
+		if errJson != nil {
+			fmt.Println("Failed to marshal message to JSON:", errJson)
+			continue
 		}
-		_, err := handler.v1.Projects.Messages.Send("projects/"+handler.projectID, req).Do()
-		if err != nil {
-			gerr, decodingErrs := common.DecodeGoogleApiError(err)
-			for _, err := range decodingErrs {
-				logs.Info.Println("fcm googleapi.Error decoding:", err)
-			}
-			switch gerr.FcmErrCode {
-			case "": // no error
-			case common.ErrorQuotaExceeded, common.ErrorUnavailable, common.ErrorInternal, common.ErrorUnspecified:
-				// Transient errors. Stop sending this batch.
-				logs.Warn.Println("fcm transient failure:", gerr.FcmErrCode, gerr.ErrMessage)
-				return
-			case common.ErrorSenderIDMismatch, common.ErrorInvalidArgument, common.ErrorThirdPartyAuth:
-				// Config errors. Stop.
-				logs.Warn.Println("fcm invalid config:", gerr.FcmErrCode, gerr.ErrMessage)
-				return
-			case common.ErrorUnregistered:
-				// Token is no longer valid. Delete token from DB and continue sending.
-				logs.Warn.Println("fcm invalid token:", gerr.FcmErrCode, gerr.ErrMessage)
-				if err := store.Devices.Delete(uids[i], messages[i].Token); err != nil {
-					logs.Warn.Println("tnpg failed to delete invalid token:", err)
-				}
-			default:
-				// Unknown error. Stop sending just in case.
-				logs.Warn.Println("tnpg unrecognized error:", gerr.FcmErrCode, gerr.ErrMessage)
-				return
-			}
-		}
+		sendToQueue(string(jsonMsg))
+		fmt.Println("FCM sent to queue")
 	}
 }
 
-func processSubscription(req *push.ChannelReq) {
-	var channel string
-	var devices []string
-	var device string
-	var channels []string
+// Skip subscription event temporarily
+// func processSubscription(req *push.ChannelReq) {
+// 	var channel string
+// 	var devices []string
+// 	var device string
+// 	var channels []string
 
-	if req.Channel != "" {
-		devices = DevicesForUser(req.Uid)
-		channel = req.Channel
-	} else if req.DeviceID != "" {
-		channels = ChannelsForUser(req.Uid)
-		device = req.DeviceID
-	}
+// 	if req.Channel != "" {
+// 		devices = DevicesForUser(req.Uid)
+// 		channel = req.Channel
+// 	} else if req.DeviceID != "" {
+// 		channels = ChannelsForUser(req.Uid)
+// 		device = req.DeviceID
+// 	}
 
-	if (len(devices) == 0 && device == "") || (len(channels) == 0 && channel == "") {
-		// No channels or devces to subscribe or unsubscribe.
-		return
-	}
+// 	if (len(devices) == 0 && device == "") || (len(channels) == 0 && channel == "") {
+// 		// No channels or devces to subscribe or unsubscribe.
+// 		return
+// 	}
 
-	if len(devices) > subBatchSize {
-		// It's extremely unlikely for a single user to have this many devices.
-		devices = devices[0:subBatchSize]
-		logs.Warn.Println("fcm: user", req.Uid.UserId(), "has more than", subBatchSize, "devices")
-	}
+// 	if len(devices) > subBatchSize {
+// 		// It's extremely unlikely for a single user to have this many devices.
+// 		devices = devices[0:subBatchSize]
+// 		logs.Warn.Println("fcm: user", req.Uid.UserId(), "has more than", subBatchSize, "devices")
+// 	}
 
-	var err error
-	var resp *legacy.TopicManagementResponse
-	if channel != "" && len(devices) > 0 {
-		if req.Unsub {
-			resp, err = handler.client.UnsubscribeFromTopic(context.Background(), devices, channel)
-		} else {
-			resp, err = handler.client.SubscribeToTopic(context.Background(), devices, channel)
-		}
-		if err != nil {
-			// Complete failure.
-			logs.Warn.Println("fcm: sub or upsub failed", req.Unsub, err)
-		} else {
-			// Check for partial failure.
-			handleSubErrors(resp, req.Uid, devices)
-		}
-		return
-	}
+// 	var err error
+// 	var resp *legacy.TopicManagementResponse
+// 	if channel != "" && len(devices) > 0 {
+// 		if req.Unsub {
+// 			resp, err = handler.client.UnsubscribeFromTopic(context.Background(), devices, channel)
+// 		} else {
+// 			resp, err = handler.client.SubscribeToTopic(context.Background(), devices, channel)
+// 		}
+// 		if err != nil {
+// 			// Complete failure.
+// 			logs.Warn.Println("fcm: sub or upsub failed", req.Unsub, err)
+// 		} else {
+// 			// Check for partial failure.
+// 			handleSubErrors(resp, req.Uid, devices)
+// 		}
+// 		return
+// 	}
 
-	if device != "" && len(channels) > 0 {
-		devices := []string{device}
-		for _, channel := range channels {
-			if req.Unsub {
-				resp, err = handler.client.UnsubscribeFromTopic(context.Background(), devices, channel)
-			} else {
-				resp, err = handler.client.SubscribeToTopic(context.Background(), devices, channel)
-			}
-			if err != nil {
-				// Complete failure.
-				logs.Warn.Println("fcm: sub or upsub failed", req.Unsub, err)
-				break
-			}
-			// Check for partial failure.
-			handleSubErrors(resp, req.Uid, devices)
-		}
-		return
-	}
+// 	if device != "" && len(channels) > 0 {
+// 		devices := []string{device}
+// 		for _, channel := range channels {
+// 			if req.Unsub {
+// 				resp, err = handler.client.UnsubscribeFromTopic(context.Background(), devices, channel)
+// 			} else {
+// 				resp, err = handler.client.SubscribeToTopic(context.Background(), devices, channel)
+// 			}
+// 			if err != nil {
+// 				// Complete failure.
+// 				logs.Warn.Println("fcm: sub or upsub failed", req.Unsub, err)
+// 				break
+// 			}
+// 			// Check for partial failure.
+// 			handleSubErrors(resp, req.Uid, devices)
+// 		}
+// 		return
+// 	}
 
-	// Invalid request: either multiple channels & multiple devices (not supported) or no channels and no devices.
-	logs.Err.Println("fcm: user", req.Uid.UserId(), "invalid combination of sub/unsub channels/devices",
-		len(devices), len(channels))
-}
+// 	// Invalid request: either multiple channels & multiple devices (not supported) or no channels and no devices.
+// 	logs.Err.Println("fcm: user", req.Uid.UserId(), "invalid combination of sub/unsub channels/devices",
+// 		len(devices), len(channels))
+// }
 
-func handleSubErrors(response *legacy.TopicManagementResponse, uid types.Uid, devices []string) {
-	if response.FailureCount <= 0 {
-		return
-	}
+// func handleSubErrors(response *legacy.TopicManagementResponse, uid types.Uid, devices []string) {
+// 	if response.FailureCount <= 0 {
+// 		return
+// 	}
 
-	for _, errinfo := range response.Errors {
-		// FCM documentation sucks. There is no list of possible errors so no action can be taken but logging.
-		logs.Warn.Println("fcm sub/unsub error", errinfo.Reason, uid, devices[errinfo.Index])
-	}
-}
+// 	for _, errinfo := range response.Errors {
+// 		// FCM documentation sucks. There is no list of possible errors so no action can be taken but logging.
+// 		logs.Warn.Println("fcm sub/unsub error", errinfo.Reason, uid, devices[errinfo.Index])
+// 	}
+// }
 
 // IsReady checks if the push handler has been initialized.
 func (Handler) IsReady() bool {
