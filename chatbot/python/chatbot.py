@@ -47,14 +47,19 @@ onCompletion = {}
 # This is needed for gRPC ssl to work correctly.
 os.environ["GRPC_SSL_CIPHER_SUITES"] = "HIGH+ECDSA"
 
+
 def log(*args):
     print(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3], *args)
 
 # Add bundle for future execution
+
+
 def add_future(tid, bundle):
     onCompletion[tid] = bundle
 
 # Shorten long strings for logging.
+
+
 def clip_long_string(obj):
     if isinstance(obj, unicode) or isinstance(obj, str):
         if len(obj) > MAX_LOG_LEN:
@@ -67,10 +72,13 @@ def clip_long_string(obj):
     else:
         return obj
 
+
 def to_json(msg):
     return json.dumps(clip_long_string(MessageToDict(msg)))
 
 # Resolve or reject the future
+
+
 def exec_future(tid, code, text, params):
     bundle = onCompletion.get(tid)
     if bundle != None:
@@ -87,13 +95,18 @@ def exec_future(tid, code, text, params):
         except Exception as err:
             log("Error handling server response", err)
 
+
 # List of active subscriptions
 subscriptions = {}
+
+
 def add_subscription(topic):
     subscriptions[topic] = True
 
+
 def del_subscription(topic):
     subscriptions.pop(topic, None)
+
 
 def subscription_failed(topic, errcode):
     if topic == 'me':
@@ -104,23 +117,30 @@ def subscription_failed(topic, errcode):
         else:
             exit(1)
 
+
 def login_error(unused, errcode):
     # Check for 409 "already authenticated".
     if errcode.get('code') != 409:
         exit(1)
 
+
 def server_version(params):
     if params == None:
         return
-    log("Server:", params['build'].decode('ascii'), params['ver'].decode('ascii'))
+    log("Server:", params['build'].decode(
+        'ascii'), params['ver'].decode('ascii'))
+
 
 def next_id():
     next_id.tid += 1
     return str(next_id.tid)
+
+
 next_id.tid = 100
 
 # Quotes from the fortune cookie file
 quotes = []
+
 
 def next_quote():
     idx = random.randrange(0, len(quotes))
@@ -129,9 +149,13 @@ def next_quote():
         idx = random.randrange(0, len(quotes))
     next_quote.idx = idx
     return quotes[idx]
+
+
 next_quote.idx = 0
 
 # This is the class for the server-side gRPC endpoints
+
+
 class Plugin(pbx.PluginServicer):
     def Account(self, acc_event, context):
         action = None
@@ -150,7 +174,9 @@ class Plugin(pbx.PluginServicer):
 
         return pb.Unused()
 
+
 queue_out = queue.Queue()
+
 
 def client_generate():
     while True:
@@ -160,8 +186,10 @@ def client_generate():
         log("out:", to_json(msg))
         yield msg
 
+
 def client_post(msg):
     queue_out.put(msg)
+
 
 def client_reset():
     # Drain the queue
@@ -171,14 +199,16 @@ def client_reset():
     except queue.Empty:
         pass
 
+
 def hello():
     tid = next_id()
     add_future(tid, {
         'onsuccess': lambda unused, params: server_version(params),
     })
     return pb.ClientMsg(hi=pb.ClientHi(id=tid, user_agent=APP_NAME + "/" + APP_VERSION + " (" +
-        platform.system() + "/" + platform.release() + "); gRPC-python/" + LIB_VERSION,
-        ver=LIB_VERSION, lang="EN"))
+                                       platform.system() + "/" + platform.release() + "); gRPC-python/" + LIB_VERSION,
+                                       ver=LIB_VERSION, lang="EN"))
+
 
 def login(cookie_file_name, scheme, secret):
     tid = next_id()
@@ -189,6 +219,7 @@ def login(cookie_file_name, scheme, secret):
     })
     return pb.ClientMsg(login=pb.ClientLogin(id=tid, scheme=scheme, secret=secret))
 
+
 def subscribe(topic):
     tid = next_id()
     add_future(tid, {
@@ -198,6 +229,7 @@ def subscribe(topic):
     })
     return pb.ClientMsg(sub=pb.ClientSub(id=tid, topic=topic))
 
+
 def leave(topic):
     tid = next_id()
     add_future(tid, {
@@ -206,13 +238,16 @@ def leave(topic):
     })
     return pb.ClientMsg(leave=pb.ClientLeave(id=tid, topic=topic))
 
+
 def publish(topic, text):
     tid = next_id()
     return pb.ClientMsg(pub=pb.ClientPub(id=tid, topic=topic, no_echo=True,
-        head={"auto": json.dumps(True).encode('utf-8')}, content=json.dumps(text).encode('utf-8')))
+                                         head={"auto": json.dumps(True).encode('utf-8')}, content=json.dumps(text).encode('utf-8')))
+
 
 def note_read(topic, seq):
     return pb.ClientMsg(note=pb.ClientNote(topic=topic, what=pb.READ, seq_id=seq))
+
 
 def init_server(listen):
     # Launch plugin server: accept connection(s) from the Tinode server.
@@ -225,14 +260,17 @@ def init_server(listen):
 
     return server
 
+
 def init_client(addr, schema, secret, cookie_file_name, secure, ssl_host):
     log("Connecting to", "secure" if secure else "", "server at", addr,
         "SNI="+ssl_host if ssl_host else "")
 
     channel = None
     if secure:
-        opts = (('grpc.ssl_target_name_override', ssl_host),) if ssl_host else None
-        channel = grpc.secure_channel(addr, grpc.ssl_channel_credentials(), opts)
+        opts = (('grpc.ssl_target_name_override',
+                ssl_host),) if ssl_host else None
+        channel = grpc.secure_channel(
+            addr, grpc.ssl_channel_credentials(), opts)
     else:
         channel = grpc.insecure_channel(addr)
 
@@ -245,15 +283,18 @@ def init_client(addr, schema, secret, cookie_file_name, secure, ssl_host):
 
     return stream
 
+
 def client_message_loop(stream):
     try:
         # Read server responses
         for msg in stream:
-            log(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3], "in:", to_json(msg))
+            log(datetime.utcnow().strftime(
+                '%Y-%m-%d %H:%M:%S.%f')[:-3], "in:", to_json(msg))
 
             if msg.HasField("ctrl"):
                 # Run code on command completion
-                exec_future(msg.ctrl.id, msg.ctrl.code, msg.ctrl.text, msg.ctrl.params)
+                exec_future(msg.ctrl.id, msg.ctrl.code,
+                            msg.ctrl.text, msg.ctrl.params)
 
             elif msg.HasField("data"):
                 # log("message from:", msg.data.from_user_id)
@@ -285,6 +326,7 @@ def client_message_loop(stream):
     except grpc._channel._Rendezvous as err:
         log("Disconnected:", err)
 
+
 def read_auth_cookie(cookie_file_name):
     """Read authentication token from a file"""
     cookie = open(cookie_file_name, 'r')
@@ -299,6 +341,7 @@ def read_auth_cookie(cookie_file_name):
     else:
         secret = params.get('secret').encode('utf-8')
     return schema, secret
+
 
 def on_login(cookie_file_name, params):
     client_post(subscribe('me'))
@@ -326,12 +369,14 @@ def on_login(cookie_file_name, params):
     except Exception as err:
         log("Failed to save authentication cookie", err)
 
+
 def load_quotes(file_name):
     with open(file_name) as f:
         for line in f:
             quotes.append(line.strip())
 
     return len(quotes)
+
 
 def run(args):
     schema = None
@@ -365,7 +410,8 @@ def run(args):
         server = init_server(args.listen)
 
         # Initialize and launch client
-        client = init_client(args.host, schema, secret, args.login_cookie, args.ssl, args.ssl_host)
+        client = init_client(args.host, schema, secret,
+                             args.login_cookie, args.ssl, args.ssl_host)
 
         # Setup closure for graceful termination
         def exit_gracefully(signo, stack_frame):
@@ -384,7 +430,8 @@ def run(args):
             client_message_loop(client)
             time.sleep(3)
             client_reset()
-            client = init_client(args.host, schema, secret, args.login_cookie, args.ssl, args.ssl_host)
+            client = init_client(args.host, schema, secret,
+                                 args.login_cookie, args.ssl, args.ssl_host)
 
         # Close connections gracefully before exiting
         server.stop(None)
@@ -401,14 +448,22 @@ if __name__ == '__main__':
     purpose = "Tino, Tinode's chatbot."
     log(purpose)
     parser = argparse.ArgumentParser(description=purpose)
-    parser.add_argument('--host', default='localhost:16060', help='address of Tinode server gRPC endpoint')
-    parser.add_argument('--ssl', action='store_true', help='use SSL to connect to the server')
-    parser.add_argument('--ssl-host', help='SSL host name to use instead of default (useful for connecting to localhost)')
-    parser.add_argument('--listen', default='0.0.0.0:40051', help='address to listen on for incoming Plugin API calls')
-    parser.add_argument('--login-basic', help='login using basic authentication username:password')
-    parser.add_argument('--login-token', help='login using token authentication')
-    parser.add_argument('--login-cookie', default='.tn-cookie', help='read credentials from the provided cookie file')
-    parser.add_argument('--quotes', default='quotes.txt', help='file with messages for the chatbot to use, one message per line')
+    parser.add_argument('--host', default='localhost:16060',
+                        help='address of Tinode server gRPC endpoint')
+    parser.add_argument('--ssl', action='store_true',
+                        help='use SSL to connect to the server')
+    parser.add_argument(
+        '--ssl-host', help='SSL host name to use instead of default (useful for connecting to localhost)')
+    parser.add_argument('--listen', default='0.0.0.0:40051',
+                        help='address to listen on for incoming Plugin API calls')
+    parser.add_argument(
+        '--login-basic', help='login using basic authentication username:password')
+    parser.add_argument(
+        '--login-token', help='login using token authentication')
+    parser.add_argument('--login-cookie', default='.tn-cookie',
+                        help='read credentials from the provided cookie file')
+    parser.add_argument('--quotes', default='quotes.txt',
+                        help='file with messages for the chatbot to use, one message per line')
     args = parser.parse_args()
 
     run(args)
