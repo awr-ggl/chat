@@ -15,7 +15,7 @@ jobs:
         run: (sudo -u ubuntu bash -c 'cd /home/ubuntu/chat_to_prod; ./build-all.sh')
   
       - name: Deploy Tinode
-        run: sudo supervisorctl update && sudo supervisorctl restart tinode && sudo supervisorctl status tinode
+        run: (sudo -u ubuntu bash -c 'sudo supervisorctl update && sudo supervisorctl restart tinode && sudo supervisorctl status tinode')
 
       - name: Notify Discord
         uses: sarisia/actions-status-discord@v1
