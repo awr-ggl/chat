@@ -9,5 +9,7 @@ jobs:
   deploy:
     name: Deploy Tinode Dev
     uses: awr-ggl/action/.github/workflows/tinode_dev.yml@main
+    with:
+      CHAT_BUILD_PATH: /home/ubuntu/chat_to_prod
     secrets:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
