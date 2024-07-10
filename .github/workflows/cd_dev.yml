@@ -5,9 +5,6 @@ on:
     branches:
       - '**'
 
-env:
-  CHANGE_DIR: cd /home/ubuntu/chat_to_prod;
-
 jobs:
   deploy:
     name: Deploy Tinode Dev
@@ -15,7 +12,7 @@ jobs:
     steps:
       
       - name: Build binary
-        run: ${{ env.CHANGE_DIR }} ./build-all.sh
+        run: sudo -u ubuntu bash -c 'cd /home/ubuntu/chat_to_prod; ./build-all.sh'
   
       - name: Deploy Tinode
         run: sudo supervisorctl update && sudo supervisorctl restart tinode
