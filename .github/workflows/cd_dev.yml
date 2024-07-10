@@ -2,11 +2,12 @@ name: Tinode Dev Deployment
 
 on:
   push:
-    branches: [ '*' ]
+    branches:
+      - '**'
 
 jobs:
   deploy:
     name: Deploy Tinode Dev
     uses: awr-ggl/action/.github/workflows/tinode_dev.yml@main
-    secrets:
+    with:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
