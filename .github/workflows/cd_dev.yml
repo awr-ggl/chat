@@ -2,16 +2,11 @@ name: Tinode Dev Deployment
 
 on:
   push:
-     branches: [development]
+    branches: [ '*' ]
 
 jobs:
   deploy:
-    name: Deploy to tinode-dev
-    if: ${{ always() }}
+    name: Deploy Tinode Dev
     uses: awr-ggl/action/.github/workflows/tinode_dev.yml@main
-    with:
-      DIRECTORY_PATH: /home/ubuntu/chat/
-      # SERVER_IP: 10.184.15.195
     secrets:
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      
