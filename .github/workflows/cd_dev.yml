@@ -5,10 +5,23 @@ on:
     branches:
       - '**'
 
+env:
+  CHANGE_DIR: cd /home/ubuntu/chat_to_prod;
+
 jobs:
   deploy:
     name: Deploy Tinode Dev
-    if: ${{ always() }}
-    uses: awr-ggl/action/.github/workflows/tinode_dev.yml@main
-    secrets:
-      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    runs-on: biznet-gio
+    steps:
+      
+      - name: Build binary
+        run: ${{ env.CHANGE_DIR }} ./build-all.sh
+  
+      - name: Deploy Tinode
+        run: sudo supervisorctl update && sudo supervisorctl restart tinode
+
+      - name: Notify Discord
+        uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
