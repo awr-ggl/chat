@@ -119,7 +119,7 @@ func (Handler) Init(jsonconf json.RawMessage) (bool, error) {
 		for {
 			select {
 			case rcpt := <-handler.input:
-				go sendFcmV1(rcpt, &config)
+				go sendBulkFcmV1(rcpt, &config)
 			case <-handler.stop:
 				return
 			}
@@ -154,7 +154,7 @@ func sendToQueue(jsonMsg string) {
 		bullmq_proxy_token = "1234"
 	}
 	// fmt.Printf("jsonMsg: %s\n", jsonMsg)
-	url := bullmq_proxy_url + "/queues/groupchat_msg_fcm/jobs"
+	url := bullmq_proxy_url + "/queues/groupchat_bulk_msg_fcm/jobs"
 	body := []byte(fmt.Sprintf(`[{"name": "msg", "data": %s}]`, jsonMsg))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
@@ -173,6 +173,23 @@ func sendToQueue(jsonMsg string) {
 		return
 	}
 	defer resp.Body.Close()
+}
+
+func sendBulkFcmV1(rcpt *push.Receipt, config *configType) {
+	messages, _ := PrepareV1Notifications(rcpt, config)
+	if len(messages) == 0 {
+		return // No messages to send
+	}
+
+	// Marshal the entire array of messages into a single JSON payload
+	jsonMsg, errJson := json.Marshal(messages)
+	if errJson != nil {
+		fmt.Println("Failed to marshal messages to JSON:", errJson)
+		return
+	}
+
+	sendToQueue(string(jsonMsg))
+	fmt.Println("FCM messages batch sent to queue")
 }
 
 func sendFcmV1(rcpt *push.Receipt, config *configType) {
