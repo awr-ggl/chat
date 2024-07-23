@@ -3,7 +3,9 @@ package fcm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	fcmv1 "google.golang.org/api/fcm/v1"
@@ -35,6 +37,7 @@ func payloadToData(pl *push.Payload) (map[string]string, error) {
 	}
 	data["topic"] = pl.Topic
 	data["ts"] = pl.Timestamp.Format(time.RFC3339Nano)
+	data["click_action"] = "android.intent.action.MAIN" // Replace with the actual action or deep link
 	// Must use "xfrom" because "from" is a reserved word. Google did not bother to document it anywhere.
 	data["xfrom"] = pl.From
 	if pl.What == push.ActMsg {
@@ -165,8 +168,12 @@ func PrepareV1Notifications(rcpt *push.Receipt, config *configType) ([]*fcmv1.Me
 					Token: d.DeviceId,
 					Data:  userData,
 				}
-
-				switch d.Platform {
+				// debug userData
+				fmt.Printf("Token: %s \n", d.DeviceId)
+				// fmt.Printf("userData: %+v\n", userData)
+				// fmt.Printf("Platform: %s\n", d.Platform)
+				platform := strings.ToLower(d.Platform)
+				switch platform {
 				case "android":
 					msg.Android = androidNotificationConfig(rcpt.Payload.What, topic, userData, config)
 				case "ios":
@@ -295,9 +302,8 @@ func androidNotificationConfig(what, topic string, data map[string]string, confi
 		Body:                 body,
 		Icon:                 config.Android.GetStringField(what, "Icon"),
 		Color:                config.Android.GetStringField(what, "Color"),
-		ClickAction:          config.Android.GetStringField(what, "ClickAction"),
+		ClickAction:          data["click_action"],
 	}
-
 	return ac
 }
 
@@ -338,6 +344,7 @@ func apnsNotificationConfig(what, topic string, data map[string]string, unread i
 		InterruptionLevel: interruptionLevel,
 		Sound:             "default",
 		ThreadID:          topic,
+		Category:          data["click_action"],
 	}
 
 	// Do not present alert for read notifications and video calls.
