@@ -155,6 +155,7 @@ func sendToQueue(jsonMsg string) {
 	}
 	// fmt.Printf("jsonMsg: %s\n", jsonMsg)
 	url := bullmq_proxy_url + "/queues/groupchat_bulk_msg_fcm/jobs"
+	fmt.Printf("queue url %s\n", url)
 	body := []byte(fmt.Sprintf(`[{"name": "msg", "data": %s}]`, jsonMsg))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
